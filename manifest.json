@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "My Chrome Extension",
+  "version": "1.0",
+  "description": "포털 기능을 위한 크롬 익스텐션",
+  "permissions": [
+    "storage", 
+    "history"
+  ],
+  "chrome_url_overrides": {
+    "newtab": "./src/pages/newtab.html"
+  },
+  "host_permissions": [
+    "https://www.google.com/*"
+  ],
+  "action": {
+    "default_icon": {
+      "16": "./src/style/icons/interrogation_16.png",
+      "64": "./src/style/icons/interrogation_64.png",
+      "128": "./src/style/icons/interrogation_128.png"
+    }
+  },
+  "icons": {
+    "16": "./src/style/icons/interrogation_16.png",
+    "64": "./src/style/icons/interrogation_64.png",
+    "128": "./src/style/icons/interrogation_128.png"
+  }
+}
