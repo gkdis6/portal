@@ -305,40 +305,60 @@ h1 {
     border-color: #007aff;
 }
 
-/* Remove Widget Button Style */
-.widget .remove-widget-btn {
-    padding: 0;
+/* Base class for widget action buttons (like toggle) */
+.widget .widget-action-btn {
     position: absolute;
     top: 8px;
-    right: 8px;
-    /* Apply consistent size and shape to all remove buttons */
+    /* right positioning depends on adjacent buttons */
     width: 20px;
     max-width: 20px; /* Prevent stretching */
     height: 20px;
-    border-radius: 50%; /* Make all buttons circular */
-    padding: 0; /* Remove padding for precise centering */
-    font-size: 12px;
-    line-height: 1; /* Align text vertically */
-    display: flex; /* Use flexbox for centering */
-    justify-content: center;
-    align-items: center;
-    /* Base appearance */
+    border-radius: 50%;
+    padding: 0;
+    border: none;
     background-color: rgba(0, 0, 0, 0.3);
     color: rgba(255, 255, 255, 0.7);
-    border: none;
+    display: flex;
+    justify-content: center;
+    align-items: center;
     cursor: pointer;
     transition: background-color 0.2s ease, color 0.2s ease;
 }
-
-.remove-widget-btn:hover {
+.widget-action-btn .material-symbols-outlined {
+    font-size: 14px; /* Adjust icon size */
+}
+.widget-action-btn:hover {
     background-color: rgba(0, 0, 0, 0.5);
     color: white;
 }
 
-/* Hover state for timer remove button still needs color override */
-.widget.timer .remove-widget-btn:hover {
+
+/* Remove Widget Button Style */
+.widget .remove-widget-btn {
+    /* Mostly inherits from widget-action-btn or has its own styles */
+    /* Ensure it's positioned correctly */
+    position: absolute;
+    top: 8px;
+    right: 8px;
+     /* Add existing specific styles if needed */
+}
+
+/* Todo Toggle Completed Button Style */
+.toggle-completed-btn {
+    right: 34px; /* Position left of the remove button (8px + 20px + 6px gap) */
+    /* Inherit most styles from .widget-action-btn */
+    /* Add specific color/bg if needed */
+    background-color: rgba(255, 255, 255, 0.25); /* Example: Different bg */
+    color: rgba(255, 255, 255, 0.8);
+}
+.toggle-completed-btn:hover {
     background-color: rgba(255, 255, 255, 0.4);
     color: white;
+}
+
+/* Hiding Completed Todo Items */
+.widget.todo.hide-completed .todo-item.completed {
+    display: none;
 }
 
 /* Custom Scrollbar Styling for Todo List */
@@ -363,13 +383,23 @@ h1 {
 
 /* Drag and Drop Placeholder Style */
 .widget-placeholder {
-    background-color: rgba(255, 255, 255, 0.1); /* Semi-transparent background */
+    background-color: rgba(255, 255, 255, 0.1);
     border-radius: 18px;
     border: 2px dashed rgba(255, 255, 255, 0.3);
-    /* Ensure it occupies grid space like a widget */
-    aspect-ratio: 1 / 1; /* Match default widget aspect ratio */
-    /* transition: all 0.2s ease; */ /* Optional transition */
+    /* aspect-ratio: 1 / 1; <-- Remove fixed aspect ratio */
     box-sizing: border-box;
+    /* Ensure placeholder takes up grid space */
+    min-height: 160px; /* Match grid-auto-rows minimum */
+}
+
+/* Apply size spans to placeholder as well */
+.widget-placeholder.widget-size-tall {
+    grid-row: span 2;
+    min-height: 340px; /* Optional: Match expected height (160*2 + 20 gap) */
+}
+
+.widget-placeholder.widget-size-wide {
+    grid-column: span 2;
 }
 
 /* Widget Size Classes */
@@ -549,6 +579,11 @@ h1 {
     border-bottom: none;
 }
 
+/* Style for item being edited */
+.shortcut-item.editing {
+    background-color: rgba(255, 255, 255, 0.1); /* Subtle highlight */
+}
+
 .shortcut-link {
     color: inherit;
     text-decoration: none;
@@ -602,11 +637,22 @@ h1 {
 
 .add-shortcut-form input[type="text"],
 .add-shortcut-form input[type="url"] {
-    flex-grow: 1;
-    margin-bottom: 0; /* Override default margin */
+    margin-bottom: 0;
     padding: 6px 8px;
     font-size: 12px;
-    min-width: 50px; /* Prevent inputs from becoming too small */
+    min-width: 50px;
+    /* Inherit other styles like background, border, color from general input styles */
+}
+
+/* Adjust flex-grow for specific inputs */
+.add-shortcut-form input[type="text"] { /* Title input */
+    /* flex-grow: 2 !important; */ /* Remove flex-grow */
+    width: 30%; /* Set explicit percentage width */
+}
+
+.add-shortcut-form input[type="url"] { /* URL input */
+    /* flex-grow: 5 !important; */ /* Remove flex-grow */
+    width: 55%; /* Set explicit percentage width, leaving space for button+gaps */
 }
 
 .add-shortcut-form button {

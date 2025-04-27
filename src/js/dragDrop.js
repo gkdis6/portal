@@ -5,11 +5,10 @@ let widgetContainerRef = null; // Reference to the container
 function createPlaceholder() {
     const p = document.createElement("div");
     p.classList.add("widget-placeholder");
-    // Match placeholder size to dragged item (optional, might need refinement)
-    if (draggedItem) {
-        p.style.height = `${draggedItem.offsetHeight}px`;
-        // p.style.width = `${draggedItem.offsetWidth}px`; // Grid handles width
-    }
+    // Size matching will be handled by copying classes
+    // if (draggedItem) {
+    //     p.style.height = `${draggedItem.offsetHeight}px`; 
+    // }
     return p;
 }
 
@@ -18,16 +17,31 @@ export function setDragDropContainer(container) {
 }
 
 export function handleDragStart(e) {
-    draggedItem = this; // 'this' refers to the dragged widget element
+    draggedItem = this;
     e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', this.dataset.id); // Use plain text for ID
+    e.dataTransfer.setData('text/plain', this.dataset.id);
 
-    // Create and insert placeholder after a short delay
+    // Create placeholder and copy classes immediately
+    placeholder = createPlaceholder();
+    if (draggedItem.classList.contains('widget-size-tall')) {
+        placeholder.classList.add('widget-size-tall');
+    }
+    if (draggedItem.classList.contains('widget-size-wide')) {
+        placeholder.classList.add('widget-size-wide');
+    }
+
+    // Replace dragged item with placeholder in the DOM immediately
+    // Need to delay this slightly to allow drag image generation
     setTimeout(() => {
-        if (!draggedItem) return;
-        placeholder = createPlaceholder();
-        draggedItem.parentNode.insertBefore(placeholder, draggedItem.nextSibling);
-        draggedItem.style.opacity = '0.5'; // Visual feedback
+        if (draggedItem && draggedItem.parentNode) {
+            try {
+                 draggedItem.parentNode.replaceChild(placeholder, draggedItem);
+                 draggedItem.style.opacity = '0.5'; // Style the ghost image being dragged
+            } catch (err) {
+                 console.error("Error replacing node on drag start:", err);
+                 placeholder = null; // Reset placeholder if replacement fails
+            }
+        }
     }, 0);
 }
 
@@ -36,64 +50,102 @@ export function handleDragOver(e) {
         e.preventDefault(); // Necessary to allow dropping
     }
     e.dataTransfer.dropEffect = 'move';
-
-    // Move placeholder based on hover position
-    if (placeholder && widgetContainerRef && this !== placeholder && this.classList.contains('widget')) {
-        const container = widgetContainerRef;
-        const children = Array.from(container.children).filter(el => el !== draggedItem);
-        const targetIndex = children.indexOf(this);
-        const placeholderIndex = children.indexOf(placeholder);
-
-        // Determine if the placeholder should go before or after the hovered item
-        const rect = this.getBoundingClientRect();
-        const midpoint = rect.top + rect.height / 2;
-
-        if (e.clientY < midpoint) {
-            // Insert before
-            container.insertBefore(placeholder, this);
-        } else {
-            // Insert after
-            container.insertBefore(placeholder, this.nextSibling);
-        }
+    if (!placeholder || !widgetContainerRef || !draggedItem) { return false; }
+    const targetElement = e.target.closest('.widget, .widget-placeholder'); // Can hover over placeholder too
+    if (!targetElement || targetElement === draggedItem) { return false; }
+    // Avoid moving placeholder onto itself
+    if (targetElement === placeholder) return false; 
+    
+    const container = widgetContainerRef;
+    const rect = targetElement.getBoundingClientRect();
+    const isPlaceholderTarget = targetElement.classList.contains('widget-placeholder');
+    let targetWidgetElement = isPlaceholderTarget ? null : targetElement;
+    
+    // If hovering over placeholder, find nearest widget neighbour to determine position
+    if (isPlaceholderTarget) {
+         // Simplified: don't move if hovering over placeholder itself? Might be jerky.
+         // Let's try moving relative to neighbours of placeholder.
+         let before = placeholder.previousElementSibling;
+         let after = placeholder.nextElementSibling;
+         // Determine target based on cursor Y pos relative to placeholder bounds?
+         // For now, let's prevent moving when over placeholder to avoid complexity
+         return false; 
     }
+    
+    // --- Move placeholder relative to targetWidgetElement --- 
+    const midpoint = rect.top + rect.height / 2; 
+    const insertBeforeTarget = e.clientY < midpoint;
+    
+    if (insertBeforeTarget) {
+         container.insertBefore(placeholder, targetWidgetElement);
+    } else {
+         container.insertBefore(placeholder, targetWidgetElement.nextSibling);
+    }
+
     return false;
 }
 
 export function handleDrop(e) {
     if (e.stopPropagation) {
-        e.stopPropagation(); // Stops the browser from redirecting.
+        e.stopPropagation();
     }
 
-    if (draggedItem && placeholder && widgetContainerRef && this.classList.contains('widget')) {
-        // Move the dragged item to the placeholder's position
-        widgetContainerRef.replaceChild(draggedItem, placeholder);
-        draggedItem.style.opacity = '1'; // Restore opacity immediately
+    // Check if the drop occurred on the placeholder or within the container
+    if (draggedItem && placeholder && placeholder.parentNode === widgetContainerRef) {
+        try {
+            // Replace the placeholder with the dragged item
+            placeholder.parentNode.replaceChild(draggedItem, placeholder);
+            draggedItem.style.opacity = '1'; // Restore opacity
+            placeholder = null; // Placeholder is removed
 
-        // Update widget order in storage
-        const newOrder = Array.from(widgetContainerRef.children)
-                           .filter(el => el.classList.contains('widget')) // Ensure only widgets are considered
-                           .map(widget => parseInt(widget.dataset.id, 10)); // Get IDs as numbers
-        updateStorageOrder(newOrder);
-    } else if (placeholder) {
-        // If dropped outside a valid target, remove placeholder
-        placeholder.remove();
+            // Update storage order
+            const newOrder = Array.from(widgetContainerRef.children)
+                               .filter(el => el.classList.contains('widget'))
+                               .map(widget => parseInt(widget.dataset.id, 10));
+            updateStorageOrder(newOrder);
+
+        } catch (error) {
+            console.error("Error replacing placeholder on drop:", error);
+            // Attempt cleanup if error occurs
+             if (placeholder && placeholder.parentNode) placeholder.remove();
+             // Try to put dragged item back if it's detached
+            if (draggedItem && !draggedItem.parentNode && widgetContainerRef) {
+                widgetContainerRef.appendChild(draggedItem);
+                 draggedItem.style.opacity = '1';
+            }
+             placeholder = null;
+        }
+    } else if (placeholder && placeholder.parentNode) {
+         // Drop outside valid area, just remove placeholder (dragEnd will put item back)
+         // placeholder.remove(); // Let dragEnd handle putting item back
     }
 
-    // Cleanup is handled in dragend
-    // draggedItem = null;
-    // placeholder = null; // Keep placeholder until dragend to avoid flicker
-
+    // Final cleanup in dragEnd
     return false;
 }
 
 export function handleDragEnd(e) {
-    // Cleanup regardless of drop success
+    // If placeholder still exists, drop was unsuccessful or cancelled
+    if (placeholder && placeholder.parentNode) {
+        try {
+            // Put the original item back where the placeholder was
+            placeholder.parentNode.replaceChild(draggedItem, placeholder);
+        } catch (error) {
+             console.error("Error putting dragged item back on drag end:", error);
+             // If replace failed, try removing placeholder and appending item
+             placeholder.remove();
+             if (draggedItem && !draggedItem.parentNode && widgetContainerRef) {
+                 widgetContainerRef.appendChild(draggedItem);
+             }
+        }
+    }
+    
+    // Restore opacity if draggedItem still exists
     if (draggedItem) {
-      draggedItem.style.opacity = '1'; // Restore visual
+      draggedItem.style.opacity = '1';
     }
-    if (placeholder) {
-        placeholder.remove(); // Remove placeholder
-    }
+
+    // Final cleanup
     draggedItem = null;
     placeholder = null;
 }

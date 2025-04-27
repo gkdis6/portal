@@ -74,10 +74,28 @@ export function createWidget(id, type, content, container) {
 
     // --- 공통 위젯 기능 (삭제 버튼) ---
     const removeBtn = document.createElement("button");
-    removeBtn.classList.add("remove-widget-btn");
+    removeBtn.classList.add("remove-widget-btn", "widget-action-btn");
     removeBtn.innerText = "✕";
     removeBtn.addEventListener("click", () => removeWidget(id, widget));
     widget.appendChild(removeBtn); // Append remove button last
+
+    // --- Add Todo Specific Toggle Button ---
+    if (type === 'todo') {
+        const toggleBtn = document.createElement("button");
+        toggleBtn.classList.add("widget-action-btn", "toggle-completed-btn");
+        toggleBtn.innerHTML = `<span class="material-symbols-outlined">visibility_off</span>`; // Start hidden
+        toggleBtn.title = "완료 항목 숨기기/보이기";
+        let showCompleted = false; // Initial state: completed items are hidden
+        widget.classList.add('hide-completed'); // Add initial class to hide completed
+
+        toggleBtn.addEventListener('click', () => {
+            showCompleted = !showCompleted;
+            widget.classList.toggle('hide-completed', !showCompleted);
+            toggleBtn.innerHTML = `<span class="material-symbols-outlined">${showCompleted ? 'visibility' : 'visibility_off'}</span>`;
+            toggleBtn.title = showCompleted ? "완료 항목 보이기" : "완료 항목 숨기기";
+        });
+        widget.appendChild(toggleBtn); // Append toggle button
+    }
 
     // --- 드래그 앤 드롭 리스너 추가 ---
     widget.addEventListener('dragstart', handleDragStart);
