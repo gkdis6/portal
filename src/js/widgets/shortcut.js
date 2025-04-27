@@ -1,9 +1,13 @@
 // src/js/widgets/shortcut.js
 
+let currentlyEditing = null; // { widgetId: id, listItem: li, originalData: {title, url} }
+
 // Helper to create a single shortcut item element
-function createShortcutElement(shortcut, id, updateWidgetContent, getShortcuts, listElement) {
+function createShortcutElement(shortcut, id, updateWidgetContent, getShortcuts, listElement, formElements) {
     const li = document.createElement('li');
     li.classList.add('shortcut-item');
+    li.dataset.title = shortcut.title; // Store data for easier lookup
+    li.dataset.url = shortcut.url;
 
     const link = document.createElement('a');
     link.href = shortcut.url;
@@ -15,23 +19,45 @@ function createShortcutElement(shortcut, id, updateWidgetContent, getShortcuts, 
     const controls = document.createElement('div');
     controls.classList.add('shortcut-controls');
 
-    // TODO: Implement Edit functionality
     const editBtn = document.createElement('button');
     editBtn.textContent = 'Edit';
     editBtn.classList.add('edit-btn');
-    editBtn.disabled = true; // Disable edit for now
     editBtn.onclick = () => {
-        // TODO: Show edit form, populate with current values
-        console.log('Edit clicked for:', shortcut);
+        // If already editing another item, reset it first
+        if (currentlyEditing && currentlyEditing.widgetId === id && currentlyEditing.listItem !== li) {
+            currentlyEditing.listItem.classList.remove('editing');
+        }
+
+        // Highlight this item
+        li.classList.add('editing');
+
+        // Populate the form
+        formElements.titleInput.value = shortcut.title;
+        formElements.urlInput.value = shortcut.url;
+        formElements.addButton.textContent = '저장'; // Change button to Save
+
+        // Store editing state
+        currentlyEditing = { widgetId: id, listItem: li, originalData: { ...shortcut } };
+
+        formElements.titleInput.focus(); // Focus title input
+        console.log('Editing started for:', shortcut);
     };
 
     const deleteBtn = document.createElement('button');
     deleteBtn.textContent = '✕';
     deleteBtn.classList.add('delete-btn');
     deleteBtn.onclick = () => {
+        // If deleting the item being edited, reset the form
+        if (currentlyEditing && currentlyEditing.widgetId === id && currentlyEditing.listItem === li) {
+            formElements.titleInput.value = '';
+            formElements.urlInput.value = '';
+            formElements.addButton.textContent = '추가';
+            currentlyEditing = null;
+        }
+        // Delete logic remains the same
         const currentShortcuts = getShortcuts().filter(s => !(s.title === shortcut.title && s.url === shortcut.url));
         updateWidgetContent(id, JSON.stringify(currentShortcuts));
-        li.remove(); // Remove from DOM
+        li.remove();
     };
 
     controls.appendChild(editBtn);
@@ -76,10 +102,14 @@ export function createShortcutContent(contentContainer, content, id, updateWidge
         console.log(`[Shortcut Debug ${id}] No shortcuts found or parsed.`);
     }
 
+    // Store form elements for access by createShortcutElement
+    const formElements = { titleInput: null, urlInput: null, addButton: null };
+
+    // Now load shortcuts, passing formElements to the helper
     shortcuts.forEach(shortcut => {
         console.log(`[Shortcut Debug ${id}] Processing shortcut:`, shortcut);
         if (shortcut && shortcut.title && shortcut.url) {
-            const element = createShortcutElement(shortcut, id, updateWidgetContent, getShortcutsFromState, list);
+            const element = createShortcutElement(shortcut, id, updateWidgetContent, getShortcutsFromState, list, formElements);
             console.log(`[Shortcut Debug ${id}] Appending element:`, element);
             list.appendChild(element);
         } else {
@@ -101,30 +131,77 @@ export function createShortcutContent(contentContainer, content, id, updateWidge
 
     const addButton = document.createElement('button');
     addButton.textContent = '추가';
-    addButton.onclick = () => {
-        const title = titleInput.value.trim();
-        const url = urlInput.value.trim();
 
-        if (title && url) {
-            // Basic URL validation (starts with http/https)
-            if (!url.startsWith('http://') && !url.startsWith('https://')) {
-                alert('URL은 http:// 또는 https:// 로 시작해야 합니다.');
-                return;
+    // Store form elements for access by createShortcutElement
+    formElements.titleInput = titleInput;
+    formElements.urlInput = urlInput;
+    formElements.addButton = addButton;
+
+    // Add/Save Button Logic
+    addButton.onclick = () => {
+        const newTitle = titleInput.value.trim();
+        const newUrl = urlInput.value.trim();
+
+        if (!newTitle || !newUrl) {
+            alert('이름과 URL을 모두 입력해주세요.');
+            return;
+        }
+        if (!newUrl.startsWith('http://') && !newUrl.startsWith('https://')) {
+            alert('URL은 http:// 또는 https:// 로 시작해야 합니다.');
+            return;
+        }
+
+        let currentShortcuts = getShortcutsFromState();
+
+        // Check if Editing
+        if (currentlyEditing && currentlyEditing.widgetId === id) {
+            const originalData = currentlyEditing.originalData;
+            const listItem = currentlyEditing.listItem;
+
+            // Find the index of the shortcut being edited
+            const indexToUpdate = currentShortcuts.findIndex(s => 
+                s.title === originalData.title && s.url === originalData.url
+            );
+
+            if (indexToUpdate > -1) {
+                // Update the shortcut in the array
+                currentShortcuts[indexToUpdate] = { title: newTitle, url: newUrl };
+                updateWidgetContent(id, JSON.stringify(currentShortcuts)); // Save updated list
+
+                // Update DOM element
+                const link = listItem.querySelector('.shortcut-link');
+                if (link) {
+                    link.href = newUrl;
+                    link.textContent = newTitle;
+                    link.title = newUrl;
+                }
+                 listItem.dataset.title = newTitle; // Update dataset too
+                 listItem.dataset.url = newUrl;
+                 listItem.classList.remove('editing'); // Remove editing highlight
+                console.log('Shortcut updated:', currentShortcuts[indexToUpdate]);
+            } else {
+                console.error('Could not find shortcut to update:', originalData);
+                listItem.classList.remove('editing'); // Still remove highlight
             }
 
-            const newShortcut = { title, url };
-            const currentShortcuts = getShortcutsFromState(); // Get current state
-            currentShortcuts.push(newShortcut);
-            updateWidgetContent(id, JSON.stringify(currentShortcuts)); // Save updated list
-
-            // Add to DOM
-            list.appendChild(createShortcutElement(newShortcut, id, updateWidgetContent, getShortcutsFromState, list));
-
-            // Clear inputs
+            // Reset form and editing state
             titleInput.value = '';
             urlInput.value = '';
+            addButton.textContent = '추가';
+            currentlyEditing = null;
+
         } else {
-            alert('이름과 URL을 모두 입력해주세요.');
+            // Adding New Shortcut
+            const newShortcut = { title: newTitle, url: newUrl };
+            currentShortcuts.push(newShortcut);
+            updateWidgetContent(id, JSON.stringify(currentShortcuts));
+
+            const newElement = createShortcutElement(newShortcut, id, updateWidgetContent, getShortcutsFromState, list, formElements);
+            list.appendChild(newElement);
+            
+            titleInput.value = '';
+            urlInput.value = '';
+            console.log('New shortcut added:', newShortcut);
         }
     };
 
